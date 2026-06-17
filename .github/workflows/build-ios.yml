@@ -1,0 +1,71 @@
+name: Build rnx2rtkp for iOS ARM64
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:   # allows manual trigger from GitHub Actions tab
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout this repo
+        uses: actions/checkout@v4
+
+      - name: Clone RTKLIB_EX_2.5.0
+        run: |
+          git clone --depth=1 https://github.com/rtklibexplorer/RTKLIB.git rtklib
+          cd rtklib
+          # Checkout the correct branch/tag
+          git fetch --tags
+          git checkout b34i  # latest demo5 branch; change to exact tag if needed
+          echo "RTKLIB cloned successfully"
+
+      - name: Show iOS SDK path
+        run: |
+          xcrun --sdk iphoneos --show-sdk-path
+          xcrun --sdk iphoneos --show-sdk-version
+
+      - name: Compile rnx2rtkp for iOS ARM64
+        run: |
+          SDK=$(xcrun --sdk iphoneos --show-sdk-path)
+
+          # Gather all RTKLIB core source files
+          SRC_DIR=rtklib/src
+          APP_DIR=rtklib/app/rnx2rtkp
+
+          # Find main app file (could be in gcc/ or src/)
+          if [ -f "$APP_DIR/gcc/rnx2rtkp.c" ]; then
+            MAIN_C="$APP_DIR/gcc/rnx2rtkp.c"
+          elif [ -f "$APP_DIR/rnx2rtkp.c" ]; then
+            MAIN_C="$APP_DIR/rnx2rtkp.c"
+          else
+            echo "Searching for rnx2rtkp.c..."
+            find rtklib -name "rnx2rtkp.c" | head -5
+            MAIN_C=$(find rtklib -name "rnx2rtkp.c" | head -1)
+          fi
+          echo "Main source: $MAIN_C"
+
+          # Compile
+          clang \
+            -target arm64-apple-ios14.0 \
+            -isysroot "$SDK" \
+            -O2 \
+            -DENAGLO -DENAGAL -DENAQZS -DENACMP -DENAIRN \
+            -I"$SRC_DIR" \
+            -o rnx2rtkp \
+            "$SRC_DIR"/*.c \
+            "$MAIN_C" \
+            -lm
+
+          echo "Build complete"
+          file rnx2rtkp
+          ls -lh rnx2rtkp
+
+      - name: Upload iOS binary as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rnx2rtkp-ios-arm64
+          path: rnx2rtkp
+          retention-days: 30
