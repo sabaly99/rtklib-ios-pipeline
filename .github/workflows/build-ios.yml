@@ -32,44 +32,6 @@ jobs:
           sed -i '' 's/return system(cmd);/return -1;/g' rtklib/src/rtkcmn.c
           echo "Patched successfully"
 
-      - name: Create receiver stubs (replaces rcv/ drivers)
-        run: |
-          cat > rtklib/src/rcv_stubs.c << 'STUBS'
-          /* Stub implementations for receiver drivers not needed by rnx2rtkp */
-          #include "../src/rtklib.h"
-
-          /* rcvraw.c stubs */
-          int input_ubx (raw_t *r, unsigned char c) { return 0; }
-          int input_ubxf(raw_t *r, FILE *f)          { return 0; }
-          int input_oem4 (raw_t *r, unsigned char c) { return 0; }
-          int input_oem4f(raw_t *r, FILE *f)          { return 0; }
-          int input_nvs (raw_t *r, unsigned char c)  { return 0; }
-          int input_nvsf(raw_t *r, FILE *f)           { return 0; }
-          int input_stq (raw_t *r, unsigned char c)  { return 0; }
-          int input_stqf(raw_t *r, FILE *f)           { return 0; }
-          int input_javad (raw_t *r, unsigned char c){ return 0; }
-          int input_javadf(raw_t *r, FILE *f)         { return 0; }
-          int input_sbp (raw_t *r, unsigned char c)  { return 0; }
-          int input_sbpf(raw_t *r, FILE *f)           { return 0; }
-          int input_cres (raw_t *r, unsigned char c) { return 0; }
-          int input_cresf(raw_t *r, FILE *f)          { return 0; }
-          int input_sbf (raw_t *r, unsigned char c)  { return 0; }
-          int input_sbff(raw_t *r, FILE *f)           { return 0; }
-          int input_bnx (raw_t *r, unsigned char c)  { return 0; }
-          int input_bnxf(raw_t *r, FILE *f)           { return 0; }
-          int input_rt17 (raw_t *r, unsigned char c) { return 0; }
-          int input_rt17f(raw_t *r, FILE *f)          { return 0; }
-          int init_rt17(raw_t *r)  { return 0; }
-          void free_rt17(raw_t *r) { return; }
-
-          /* stream.c stubs */
-          int gen_ubx(const char *msg, unsigned char *buff) { return 0; }
-          int gen_stq(const char *msg, unsigned char *buff) { return 0; }
-          int gen_nvs(const char *msg, unsigned char *buff) { return 0; }
-          STUBS
-          echo "Stubs created"
-          cat rtklib/src/rcv_stubs.c
-
       - name: Compile rnx2rtkp for iOS ARM64
         run: |
           SDK=$(xcrun --sdk iphoneos --show-sdk-path)
@@ -87,7 +49,7 @@ jobs:
             -I"$SRC_DIR" \
             -o rnx2rtkp \
             $TOP_SRC \
-            "$SRC_DIR/rcv_stubs.c" \
+            rcv_stubs.c \
             "$MAIN_C" \
             -lm
 
