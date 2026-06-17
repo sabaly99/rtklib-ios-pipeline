@@ -20,6 +20,8 @@ jobs:
           git fetch --tags
           git checkout b34i
           echo "RTKLIB cloned successfully"
+          echo "--- src directory contents ---"
+          ls rtklib/src/ || ls src/
 
       - name: Show iOS SDK path
         run: |
@@ -30,10 +32,7 @@ jobs:
         run: |
           sed -i '' 's/return system(cmd);/return -1;/g' rtklib/src/download.c
           sed -i '' 's/return system(cmd);/return -1;/g' rtklib/src/rtkcmn.c
-          echo "Patched download.c:"
-          grep -n "system" rtklib/src/download.c | head -5
-          echo "Patched rtkcmn.c:"
-          grep -n "system" rtklib/src/rtkcmn.c | head -5
+          echo "Patched successfully"
 
       - name: Compile rnx2rtkp for iOS ARM64
         run: |
@@ -41,6 +40,12 @@ jobs:
           SRC_DIR=rtklib/src
           MAIN_C=$(find rtklib -name "rnx2rtkp.c" | head -1)
           echo "Main source: $MAIN_C"
+
+          # Collect ALL .c files recursively under src/ (includes receiver subdirs)
+          ALL_SRC=$(find "$SRC_DIR" -name "*.c" | tr '\n' ' ')
+          echo "Source files found:"
+          find "$SRC_DIR" -name "*.c"
+
           clang \
             -target arm64-apple-ios14.0 \
             -isysroot "$SDK" \
@@ -48,9 +53,10 @@ jobs:
             -DENAGLO -DENAGAL -DENAQZS -DENACMP -DENAIRN \
             -I"$SRC_DIR" \
             -o rnx2rtkp \
-            "$SRC_DIR"/*.c \
+            $ALL_SRC \
             "$MAIN_C" \
             -lm
+
           echo "Build complete"
           file rnx2rtkp
           ls -lh rnx2rtkp
