@@ -28,8 +28,8 @@ jobs:
 
       - name: Patch out system() calls incompatible with iOS
         run: |
-          sed -i 's/return system(cmd);/return -1;/g' rtklib/src/download.c
-          sed -i 's/return system(cmd);/return -1;/g' rtklib/src/rtkcmn.c
+          sed -i '' 's/return system(cmd);/return -1;/g' rtklib/src/download.c
+          sed -i '' 's/return system(cmd);/return -1;/g' rtklib/src/rtkcmn.c
           echo "Patched download.c:"
           grep -n "system" rtklib/src/download.c | head -5
           echo "Patched rtkcmn.c:"
