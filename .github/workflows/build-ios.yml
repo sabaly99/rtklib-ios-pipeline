@@ -20,8 +20,6 @@ jobs:
           git fetch --tags
           git checkout b34i
           echo "RTKLIB cloned successfully"
-          echo "--- src directory contents ---"
-          ls rtklib/src/ || ls src/
 
       - name: Show iOS SDK path
         run: |
@@ -41,10 +39,11 @@ jobs:
           MAIN_C=$(find rtklib -name "rnx2rtkp.c" | head -1)
           echo "Main source: $MAIN_C"
 
-          # Collect ALL .c files recursively under src/ (includes receiver subdirs)
-          ALL_SRC=$(find "$SRC_DIR" -name "*.c" | tr '\n' ' ')
-          echo "Source files found:"
-          find "$SRC_DIR" -name "*.c"
+          # Only top-level src/*.c — exclude rcv/ subdirectory entirely
+          # rcv/ contains raw receiver drivers not needed by rnx2rtkp (RINEX processor)
+          TOP_SRC=$(find "$SRC_DIR" -maxdepth 1 -name "*.c" | tr '\n' ' ')
+          echo "Source files:"
+          find "$SRC_DIR" -maxdepth 1 -name "*.c"
 
           clang \
             -target arm64-apple-ios14.0 \
@@ -53,7 +52,7 @@ jobs:
             -DENAGLO -DENAGAL -DENAQZS -DENACMP -DENAIRN \
             -I"$SRC_DIR" \
             -o rnx2rtkp \
-            $ALL_SRC \
+            $TOP_SRC \
             "$MAIN_C" \
             -lm
 
