@@ -3,7 +3,7 @@ name: Build rnx2rtkp for iOS ARM64
 on:
   push:
     branches: [ main ]
-  workflow_dispatch:   # allows manual trigger from GitHub Actions tab
+  workflow_dispatch:
 
 jobs:
   build:
@@ -17,9 +17,8 @@ jobs:
         run: |
           git clone --depth=1 https://github.com/rtklibexplorer/RTKLIB.git rtklib
           cd rtklib
-          # Checkout the correct branch/tag
           git fetch --tags
-          git checkout b34i  # latest demo5 branch; change to exact tag if needed
+          git checkout b34i
           echo "RTKLIB cloned successfully"
 
       - name: Show iOS SDK path
@@ -27,27 +26,39 @@ jobs:
           xcrun --sdk iphoneos --show-sdk-path
           xcrun --sdk iphoneos --show-sdk-version
 
+      - name: Patch out system() calls incompatible with iOS
+        run: |
+          python3 - << 'PYEOF'
+          import re
+
+          files = [
+              "rtklib/src/download.c",
+              "rtklib/src/rtkcmn.c",
+          ]
+
+          for path in files:
+              with open(path, "r") as f:
+                  content = f.read()
+              # Replace any line that calls system(cmd) with return -1
+              patched = re.sub(r'return\s+system\s*\(\s*cmd\s*\)\s*;', 'return -1; /* system() unavailable on iOS */', content)
+              with open(path, "w") as f:
+                  f.write(patched)
+              print(f"Patched {path}")
+              # Verify
+              for i, line in enumerate(patched.splitlines(), 1):
+                  if "system" in line:
+                      print(f"  line {i}: {line.strip()}")
+          PYEOF
+
       - name: Compile rnx2rtkp for iOS ARM64
         run: |
           SDK=$(xcrun --sdk iphoneos --show-sdk-path)
-
-          # Gather all RTKLIB core source files
           SRC_DIR=rtklib/src
-          APP_DIR=rtklib/app/rnx2rtkp
-
-          # Find main app file (could be in gcc/ or src/)
-          if [ -f "$APP_DIR/gcc/rnx2rtkp.c" ]; then
-            MAIN_C="$APP_DIR/gcc/rnx2rtkp.c"
-          elif [ -f "$APP_DIR/rnx2rtkp.c" ]; then
-            MAIN_C="$APP_DIR/rnx2rtkp.c"
-          else
-            echo "Searching for rnx2rtkp.c..."
-            find rtklib -name "rnx2rtkp.c" | head -5
-            MAIN_C=$(find rtklib -name "rnx2rtkp.c" | head -1)
-          fi
+          MAIN_C=$(find rtklib -name "rnx2rtkp.c" | head -1)
           echo "Main source: $MAIN_C"
 
-          # Compile
+          TOP_SRC=$(find "$SRC_DIR" -maxdepth 1 -name "*.c" | tr '\n' ' ')
+
           clang \
             -target arm64-apple-ios14.0 \
             -isysroot "$SDK" \
@@ -55,38 +66,14 @@ jobs:
             -DENAGLO -DENAGAL -DENAQZS -DENACMP -DENAIRN \
             -I"$SRC_DIR" \
             -o rnx2rtkp \
-            "$SRC_DIR"/*.c \
+            $TOP_SRC \
+            rcv_stubs.c \
             "$MAIN_C" \
             -lm
 
           echo "Build complete"
           file rnx2rtkp
           ls -lh rnx2rtkp
-
-      - name: Install ldid for signing
-        run: |
-          brew install ldid
-
-      - name: Sign binary for a-Shell (ad-hoc entitlements)
-        run: |
-          # Write a minimal entitlements plist that satisfies a-Shell's sandbox
-          cat > entitlements.xml << 'EOF'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
-            "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>platform-application</key>
-            <true/>
-            <key>com.apple.private.security.no-container</key>
-            <true/>
-          </dict>
-          </plist>
-          EOF
-
-          ldid -Sentitlements.xml rnx2rtkp
-          echo "Signing complete"
-          ldid -e rnx2rtkp   # print entitlements to confirm
 
       - name: Upload iOS binary as artifact
         uses: actions/upload-artifact@v4
