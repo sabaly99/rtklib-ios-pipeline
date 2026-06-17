@@ -39,12 +39,10 @@ jobs:
           for path in files:
               with open(path, "r") as f:
                   content = f.read()
-              # Replace any line that calls system(cmd) with return -1
               patched = re.sub(r'return\s+system\s*\(\s*cmd\s*\)\s*;', 'return -1; /* system() unavailable on iOS */', content)
               with open(path, "w") as f:
                   f.write(patched)
               print(f"Patched {path}")
-              # Verify
               for i, line in enumerate(patched.splitlines(), 1):
                   if "system" in line:
                       print(f"  line {i}: {line.strip()}")
@@ -57,6 +55,8 @@ jobs:
           MAIN_C=$(find rtklib -name "rnx2rtkp.c" | head -1)
           echo "Main source: $MAIN_C"
 
+          # Only top-level src/*.c — rcv/ subdirectory excluded (not needed by rnx2rtkp)
+          # Missing rcv/ symbols are satisfied by rcv_stubs.c in this repo
           TOP_SRC=$(find "$SRC_DIR" -maxdepth 1 -name "*.c" | tr '\n' ' ')
 
           clang \
@@ -74,6 +74,28 @@ jobs:
           echo "Build complete"
           file rnx2rtkp
           ls -lh rnx2rtkp
+
+      - name: Install ldid for signing
+        run: brew install ldid
+
+      - name: Sign binary for a-Shell
+        run: |
+          cat > entitlements.xml << 'ENTEOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+            "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>platform-application</key>
+            <true/>
+            <key>com.apple.private.security.no-container</key>
+            <true/>
+          </dict>
+          </plist>
+          ENTEOF
+          ldid -Sentitlements.xml rnx2rtkp
+          echo "Signing complete"
+          ldid -e rnx2rtkp
 
       - name: Upload iOS binary as artifact
         uses: actions/upload-artifact@v4
