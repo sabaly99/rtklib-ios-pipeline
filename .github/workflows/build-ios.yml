@@ -3,7 +3,7 @@ name: Build rnx2rtkp for iOS ARM64
 on:
   push:
     branches: [ main ]
-  workflow_dispatch:   # allows manual trigger from GitHub Actions tab
+  workflow_dispatch:
 
 jobs:
   build:
@@ -17,9 +17,8 @@ jobs:
         run: |
           git clone --depth=1 https://github.com/rtklibexplorer/RTKLIB.git rtklib
           cd rtklib
-          # Checkout the correct branch/tag
           git fetch --tags
-          git checkout b34i  # latest demo5 branch; change to exact tag if needed
+          git checkout b34i
           echo "RTKLIB cloned successfully"
 
       - name: Show iOS SDK path
@@ -27,14 +26,10 @@ jobs:
           xcrun --sdk iphoneos --show-sdk-path
           xcrun --sdk iphoneos --show-sdk-version
 
-     - name: Patch out system() calls incompatible with iOS
+      - name: Patch out system() calls incompatible with iOS
         run: |
-          # download.c — replace system(cmd) with a stub that returns -1
-          sed -i 's/return system(cmd);/return -1; \/* system() unavailable on iOS *\//g' rtklib/src/download.c
-
-          # rtkcmn.c — same fix
-          sed -i 's/return system(cmd);/return -1; \/* system() unavailable on iOS *\//g' rtklib/src/rtkcmn.c
-
+          sed -i 's/return system(cmd);/return -1;/g' rtklib/src/download.c
+          sed -i 's/return system(cmd);/return -1;/g' rtklib/src/rtkcmn.c
           echo "Patched download.c:"
           grep -n "system" rtklib/src/download.c | head -5
           echo "Patched rtkcmn.c:"
@@ -46,7 +41,6 @@ jobs:
           SRC_DIR=rtklib/src
           MAIN_C=$(find rtklib -name "rnx2rtkp.c" | head -1)
           echo "Main source: $MAIN_C"
-
           clang \
             -target arm64-apple-ios14.0 \
             -isysroot "$SDK" \
@@ -57,7 +51,6 @@ jobs:
             "$SRC_DIR"/*.c \
             "$MAIN_C" \
             -lm
-
           echo "Build complete"
           file rnx2rtkp
           ls -lh rnx2rtkp
