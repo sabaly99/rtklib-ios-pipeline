@@ -27,27 +27,26 @@ jobs:
           xcrun --sdk iphoneos --show-sdk-path
           xcrun --sdk iphoneos --show-sdk-version
 
+     - name: Patch out system() calls incompatible with iOS
+        run: |
+          # download.c — replace system(cmd) with a stub that returns -1
+          sed -i 's/return system(cmd);/return -1; \/* system() unavailable on iOS *\//g' rtklib/src/download.c
+
+          # rtkcmn.c — same fix
+          sed -i 's/return system(cmd);/return -1; \/* system() unavailable on iOS *\//g' rtklib/src/rtkcmn.c
+
+          echo "Patched download.c:"
+          grep -n "system" rtklib/src/download.c | head -5
+          echo "Patched rtkcmn.c:"
+          grep -n "system" rtklib/src/rtkcmn.c | head -5
+
       - name: Compile rnx2rtkp for iOS ARM64
         run: |
           SDK=$(xcrun --sdk iphoneos --show-sdk-path)
-
-          # Gather all RTKLIB core source files
           SRC_DIR=rtklib/src
-          APP_DIR=rtklib/app/rnx2rtkp
-
-          # Find main app file (could be in gcc/ or src/)
-          if [ -f "$APP_DIR/gcc/rnx2rtkp.c" ]; then
-            MAIN_C="$APP_DIR/gcc/rnx2rtkp.c"
-          elif [ -f "$APP_DIR/rnx2rtkp.c" ]; then
-            MAIN_C="$APP_DIR/rnx2rtkp.c"
-          else
-            echo "Searching for rnx2rtkp.c..."
-            find rtklib -name "rnx2rtkp.c" | head -5
-            MAIN_C=$(find rtklib -name "rnx2rtkp.c" | head -1)
-          fi
+          MAIN_C=$(find rtklib -name "rnx2rtkp.c" | head -1)
           echo "Main source: $MAIN_C"
 
-          # Compile
           clang \
             -target arm64-apple-ios14.0 \
             -isysroot "$SDK" \
